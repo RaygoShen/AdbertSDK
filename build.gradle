@@ -1,0 +1,316 @@
+apply plugin: 'com.android.library'
+//apply plugin: 'com.novoda.bintray-release'
+apply plugin: 'com.github.dcendents.android-maven'
+apply plugin: 'com.jfrog.bintray'
+//你的library版本号
+//version = "3.2.0"
+
+android {
+    compileSdkVersion 25
+    buildToolsVersion '25.0.3'
+
+    defaultConfig {
+        minSdkVersion 19
+        targetSdkVersion 23
+        versionCode 1
+        versionName "1.0"
+//        consumerProguardFiles 'proguard-rules.pro'
+    }
+    buildTypes {
+        release {
+            minifyEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'),
+                    'proguard-rules.pro'
+//            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+    //for build fail, it will run lint checks but won't abort build
+    lintOptions {
+        abortOnError false
+    }
+}
+
+
+buildscript {
+    repositories {
+        jcenter()
+    }
+
+}
+
+dependencies {
+    compile fileTree(include: ['*.jar'], dir: 'libs')
+    testCompile 'junit:junit:4.12'
+    compile 'com.android.support:appcompat-v7:25.3.1'
+    compile 'com.google.android.gms:play-services:9.4.0'
+    compile 'com.github.bumptech.glide:glide:3.7.0'
+    compile 'com.alexvasilkov:android-commons:1.2.4'
+}
+
+// 移除舊的 jar 檔
+task deleteOldJar(type: Delete) {
+    delete 'build/outputs/adbert-sdk-320n.jar'
+}
+
+// 匯出 jar 檔
+task exportJar(type: Copy) {
+    from('build/intermediates/bundles/release/')
+    into('build/outputs/')
+    include('classes.jar')
+    // 將匯出的 jar 檔重新命名
+    rename('classes.jar', 'adbert-sdk-320n.jar')
+}
+
+exportJar.dependsOn(deleteOldJar, build)
+
+//需添加如下内容
+
+apply plugin: 'com.github.dcendents.android-maven'
+apply plugin: 'com.jfrog.bintray'
+
+
+//發佈到組織名稱名字，必須填寫
+group = "com.adbertech"
+//發佈到JCenter上的項目名字，必須填寫
+def libName = "adbert-sdk"
+// 版本號，下次更新是只需要更改版本號即可
+version = "3.2.0"
+/**  上面配置后上传至jcenter后的编译路径是这样的： compile       'com.fighter.maven:mylibs:1.0.0'  **/
+
+//生成源文件
+task sourcesJar(type: Jar) {
+    from android.sourceSets.main.java.srcDirs
+    //let the name of jar file without'-sources'
+//    classifier = 'sources'
+}
+//生成文檔
+task javadoc(type: Javadoc) {
+    source = android.sourceSets.main.java.srcDirs
+    classpath += project.files(android.getBootClasspath().join(File.pathSeparator))
+    options.encoding "UTF-8"
+    options.charSet 'UTF-8'
+    options.author true
+    options.version true
+    failOnError false
+}
+
+//文檔打包成jar
+task javadocJar(type: Jar, dependsOn: javadoc) {
+    classifier = 'javadoc'
+    from javadoc.destinationDir
+}
+//拷背javadoc文件
+task copyDoc(type: Copy) {
+    from "${buildDir}/docs/"
+    into "docs"
+}
+
+//上傳到jcenter所需要的源碼文件
+artifacts {
+    //do not upload javadoc.jar file
+//    archives javadocJar
+    archives sourcesJar
+}
+
+// 配置maven庫，生成POM.xml文件
+install {
+    repositories.mavenInstaller {
+        // This generates POM.xml with proper parameters
+        pom {
+            project {
+                packaging 'aar'
+                name 'AdbertSDK'
+                developers {
+                    developer {
+                        id 'adbertech2017'
+                        name 'Adbert'
+                        email 'paulliu@adbert.com.tw'
+                    }
+                }
+            }
+        }
+    }
+}
+
+//上傳到jcenter
+Properties properties = new Properties()
+properties.load(project.rootProject.file('local.properties').newDataInputStream())
+bintray {
+    user = properties.getProperty("bintray.user")    //读取 local.properties 文件里面的 bintray.user
+    key = properties.getProperty("bintray.apikey")   //读取 local.properties 文件里面的 bintray.apikey
+    configurations = ['archives']
+    pkg {
+        userOrg = "adbertechsdk"
+        repo = "AdbertSDK"
+        name = libName    //发布到JCenter上的项目名字，必须填写
+        desc = 'The Adbert SDK for Android.'    //项目描述
+        licenses = ["Apache-2.0"]
+        publish = true
+    }
+}
+
+//ext {
+//    ARTIFACT_ID = 'com.adbertech'
+//    VERSION_NAME = '3.0.0'
+//    VERSION_CODE = 1 //your version
+//
+//    DESCRIPTION = 'The Adbert SDK of android'
+//
+//    SITE_URL = 'http://wiki.adbert.com.tw/doku.php'
+//    GIT_URL = 'https://gitlab.com/adbert/adbertsdk.git'
+//    GROUP_NAME = 'AdbertSDK'
+//    COMPILE_SDK = 25
+//    BUILD_TOOLS = '25.0.3'
+//
+//    MODULE_NAME = 'adbert-sdk'
+//
+//    LICENSE = 'Apache-2.0'
+//
+//    DEVELOPER_ID = 'adbertech2017'
+//    DEVELOPER_NAME = 'Adbert'
+//    DEVELOPER_EMAIL = 'paulliu@adbert.com.tw'
+//
+//    IS_UPLOADING = project.getGradle().startParameter.taskNames.any{it.contains('bintrayUpload')}
+//}
+//
+//subprojects {
+//    group = "com.adbertech"
+//    version = "3.0.0"
+//
+//    if (IS_UPLOADING && project.name in [adbert-sdk]) {
+//        println project.name
+//        apply plugin: 'maven'
+//
+//        gradle.taskGraph.whenReady { taskGraph ->
+//            taskGraph.getAllTasks().find {
+//                it.path == ":$project.name:generatePomFileForMavenPublication"
+//            }.doLast {
+//                file("build/publications/maven/pom-default.xml").delete()
+//                println 'Overriding pom-file to make sure we can sync to maven central!'
+//                pom {
+//                    //noinspection GroovyAssignabilityCheck
+//                    project {
+//                        name "$project.name"
+//                        artifactId ARTIFACT_ID
+//                        packaging project.name == 'compiler' ? 'jar' : 'aar'
+//                        description DESCRIPTION
+//                        url SITE_URL
+//                        version VERSION_NAME
+//
+//                        scm {
+//                            url GIT_URL
+//                            connection GIT_URL
+//                            developerConnection GIT_URL
+//                        }
+//
+//                        licenses {
+//                            license {
+//                                name LICENSE
+//                            }
+//                        }
+//
+//                        developers {
+//                            developer {
+//                                id DEVELOPER_ID
+//                                name DEVELOPER_NAME
+//                                email DEVELOPER_EMAIL
+//                            }
+//                        }
+//                    }
+//                }.writeTo("build/publications/maven/pom-default.xml")
+//            }
+//        }
+//    }
+//}
+
+
+
+////你的library的地址
+//def siteUrl = 'http://wiki.adbert.com.tw/doku.php'
+//def gitUrl = 'http://wiki.adbert.com.tw/doku.php'
+//def issueUrl = 'http://wiki.adbert.com.tw/doku.php?id=android:problem'
+//
+////这个蛮重要的，你上传到jCenter后一些文件存放的路径，如果不写或者写错了的话
+////可以不会产生pom文件，后面上传到jCenter后会报错，这个问题我搞了一下午！
+//group = "com.adbertech"
+//install {
+//    repositories.mavenInstaller {
+//        // POM.xml文件内容
+//        pom {
+//            project {
+//                packaging 'aar'
+//                // 添加描述，不重要
+//                name 'AdbertSDK'
+//                url siteUrl
+//                // 协议
+//                licenses {
+//                    license {
+//                        name 'The Apache Software License, Version 2.0'
+//                        url 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+//                    }
+//                }
+//                developers {
+//                    developer {
+//                        id 'adbert' //your user ID
+//                        name 'Adbert' //your name
+//                        email 'paulliu@adbert.com.tw' //your email
+//                    }
+//                }
+//                scm {
+//                    connection gitUrl
+//                    developerConnection gitUrl
+//                    url siteUrl
+//                }
+//            }
+//        }
+//    }
+//}
+//task sourcesJar(type: Jar) {
+//    from android.sourceSets.main.java.srcDirs
+//    classifier = 'sources'
+//}
+//
+//task javadoc(type: Javadoc) {
+//
+//    //增加编码，这行很重要，如果是windows系统，同时如果在代码中有中文的话，不加这行，上传会报错
+//    options.encoding="utf-8"
+//    source = android.sourceSets.main.java.srcDirs
+//    classpath += project.files(android.getBootClasspath().join(File.pathSeparator))
+//}
+//task javadocJar(type: Jar, dependsOn: javadoc) {
+//    classifier = 'javadoc'
+//    from javadoc.destinationDir
+//}
+//artifacts {
+//    archives javadocJar
+//    archives sourcesJar
+//}
+//Properties properties = new Properties()
+//properties.load(project.rootProject.file('local.properties').newDataInputStream())
+//bintray {
+//    user = properties.getProperty("bintray.user")
+//    key = properties.getProperty("bintray.apikey")
+//    configurations = ['archives']
+//    pkg {
+//        //发布到Bintray的哪个仓库
+//        repo = "maven"
+//        //发布到Bintray上的名字
+//        name = "adbert-sdk"
+//        //项目描述
+//        desc = "The Adbert SDK for Android."
+//        websiteUrl = siteUrl
+//        vcsUrl = gitUrl
+//        issueTrackerUrl = issueUrl
+//        licenses = ["Apache-2.0"]
+//        //标签
+//        labels = ['android']
+//        publish = true
+//        publicDownloadNumbers = true
+//    }
+//}
+//Add these lines to publish library to bintray. This is the readymade scripts made by github user nuuneoi to make uploading to bintray easy.
+//Place it at the end of the file
+//apply from: 'bintrayUpload.gradle'
+//apply from: 'https://raw.githubusercontent.com/nuuneoi/JCenter/master/installv1.gradle'
+//apply from: 'https://raw.githubusercontent.com/nuuneoi/JCenter/master/bintrayv1.gradle'
+
